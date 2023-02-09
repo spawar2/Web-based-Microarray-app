@@ -1,0 +1,30 @@
+#!/usr/bin/env python
+import xml.sax
+
+'''
+Author: Shrikant Pawar; Advanced Bio informatics; 2/18/2016
+Description of this program: This program pulls out the sequence data between two tags "align" from an xml page. Here it has taken test.xml file as input
+you can input the file of your choice in main.
+'''
+
+
+class ABContentHandler(xml.sax.ContentHandler):
+  def __init__(self):
+    xml.sax.ContentHandler.__init__(self)
+
+  def startElement(self, name, attrs):
+    print("startElement '" + name + "'")
+    if name == "align":
+
+        def endElement(self, name):
+          print("endElement '" + name + "'")
+
+  def characters(self, content):
+    print("characters '" + content + "'")
+
+def main(sourceFileName):
+  source = open(sourceFileName)
+  xml.sax.parse(source, ABContentHandler())
+
+if __name__ == "__main__":
+  main("test.xml")

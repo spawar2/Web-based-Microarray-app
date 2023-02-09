@@ -1,0 +1,143 @@
+import time
+import BaseHTTPServer
+import re
+import os
+import Classifier as cs
+import Constants
+import normalize
+
+class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+    classifier=cs.Classifier()
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+
+    def do_GET(self):
+        """Respond to a GET request."""
+        if self.path == Constants.GET_PATH:
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            self.wfile.write('<html><head><title>Lung Cancer Prediction from Microarray data</title></head>')
+            self.wfile.write('<body bgcolor="#E6E6FA">\
+<centre>\
+<form action="predict_result" id="upload_form" enctype="multipart/form-data" method="POST">\
+<table style="width:auto; top:30%; left:25%; right:30%; position:absolute; border: 0px; border-collapse: collapse;zoom:1.7; "  border="0"  >\
+  <tr style="background-color: LightBlue;">\
+    <td  colspan=2 align="center" ><h3><i>Microarray Data - Lung Cancer Prediction</h3></td>  </tr>\
+  <tr style="background-color: LightBlue;">\
+    <td align="right"><b>&nbsp;Please enter the file: </td>\
+    <td align="right"> &nbsp;&nbsp;&nbsp;<input type="file" name="celfile" accept=".cel" ></td>\
+  </tr>\
+  <tr style="background-color: LightBlue;">\
+    <td colspan=2 align="center"> &nbsp; </td>\
+  </tr>\
+  <tr style="background-color: LightBlue;">\
+    <td colspan=2 align="center"><input type="submit"></td>\
+  </tr>\
+  <tr style="background-color: LightBlue;">\
+    <td colspan=2 align="center"> &nbsp; </td>\
+  </tr>\
+   <tr style="background-color: LightBlue;">\
+    <td colspan=2 align="center"><i><strong>Note:</strong> Please enter a \'.cel\' microarray data file. </i></td>\
+  </tr>\
+</table> </form> </centre>\
+')
+            self.wfile.write("</body></html>")
+
+    def do_POST(self):
+        if self.path == Constants.POST_PATH:
+            length = self.headers['content-length']
+            upload_status, fileName=self.deal_post_data()
+            if(upload_status) :
+                normalize.normalize()
+                cancerResult, predictionProbPercentage= self.classifier.get_prediction_result()
+
+                self.send_response(200)
+                self.get_html_response_after_prediction(cancerResult,predictionProbPercentage, fileName)
+            else:
+                self.send_error(400, "File upload failed. Given file cannot be uploaded.")
+
+    def get_html_response_after_prediction(self, result, predictionProbPercentage,  fileName):
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write("<html><head><title>Lung Cancer Prediction from Microarray data</title></head>")
+        self.wfile.write('<body bgcolor="#E6E6FA">\
+                <centre>\
+                <table style="width:auto; top:30%%; left:25%%; right:30%%; position:absolute; border: 0px;border-collapse: collapse;zoom:1.7; "   border="0"  >\
+                  <tr style="background-color: LightBlue;">\
+                    <td  colspan=2 align="center" ><h3><i>&nbsp;&nbsp;&nbsp;Microarray Data - Lung Cancer Prediction&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</h3></td> \
+                 </tr>\
+                  <tr style="background-color: LightBlue;">\
+                    <td align="right" style="padding-bottom: 1em"> Uploaded file name :</td>\
+                    <td align="center" style="color:red;padding-bottom: 1em"> %s </td>\
+                  </tr>\
+                  <tr style="background-color: LightBlue;">\
+                    <td align="right" style="padding-bottom: 1em"> Uploaded microarraydata has :  </td>\
+                    <td align="center" style="color:red;padding-bottom: 1em"> %s </td>\
+                  </tr>\
+                  <tr style="background-color: LightBlue;">\
+                    <td align="right">Prediction Probability(%%) : </td>\
+                    <td align="center"><strong> %s%% </td>\
+                  </tr>  \
+                  <tr style="background-color: LightBlue;">\
+                    <td colspan=2 align="center"> &nbsp; </td>\
+                  </tr>\
+                   ' % (fileName, result, predictionProbPercentage))
+        self.wfile.write(' <tr style="background-color: LightBlue;">\
+                                <td colspan=2 align="center"><i><a href="http://%s:%s%s">Try Another!</a></td>\
+                          </tr>' % (Constants.HOST_NAME, Constants.PORT_NUMBER, Constants.GET_PATH))
+        self.wfile.write("</table> </centre> </body></html>")
+
+    def deal_post_data(self):
+        boundary = self.headers.plisttext.split("=")[1]
+        remainbytes = int(self.headers['content-length'])
+        line = self.rfile.readline()
+        remainbytes -= len(line)
+        if not boundary in line:
+            return (False, "Content does NOT begin with boundary")
+        line = self.rfile.readline()
+        remainbytes -= len(line)
+        fileName = re.findall(r'Content-Disposition.*name="celfile"; filename="(.*)"', line)
+        if not fileName:
+            return (False, "File name not found!!..")
+
+        fn = os.path.join(Constants.TEMP_FILE_STORE_PATH, fileName[0])
+        line = self.rfile.readline()
+        remainbytes -= len(line)
+        line = self.rfile.readline()
+        remainbytes -= len(line)
+        try:
+            out = open(fn, 'wb')
+        except IOError:
+            return (False, "Error in creating file!! (Check if you have write permissions here :%s"%Constants.TEMP_FILE_STORE_PATH )
+
+        preline = self.rfile.readline()
+        remainbytes -= len(preline)
+        while remainbytes > 0:
+            line = self.rfile.readline()
+            remainbytes -= len(line)
+            if boundary in line:
+                preline = preline[0:-1]
+                if preline.endswith('\r'):
+                    preline = preline[0:-1]
+                out.write(preline)
+                out.close()
+                return (True, fileName[0])
+            else:
+                out.write(preline)
+                preline = line
+        return (False, "Unexpected end of data.")
+
+if __name__ == '__main__':
+    server_class = BaseHTTPServer.HTTPServer
+    httpd = server_class((Constants.HOST_NAME, Constants.PORT_NUMBER), MyHandler)
+    print time.asctime(), "Server Starts - http://%s:%s%s" % (Constants.HOST_NAME, Constants.PORT_NUMBER, Constants.GET_PATH)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    httpd.server_close()
+    print time.asctime(), "Server Stops - %s:%s" % (Constants.HOST_NAME, Constants.PORT_NUMBER)

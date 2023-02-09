@@ -1,0 +1,30 @@
+# Purpose of code: Python code for GUI to import .CEL file and export results
+# Author: Shrikant. p, Date: 04/14/16
+
+from Tkinter import *
+from tkFileDialog import askopenfilename
+import tkSimpleDialog
+import tkMessageBox
+
+# Setting up GUIs
+
+root = Tk()
+
+root.title("Labeler")
+root.geometry("200x100")
+app = Frame(root)
+app.grid()
+
+# Getting user info
+
+def callback():
+    r = open(askopenfilename(),'r')
+
+a = Button(text='This a machine learning program for Microarray analysis: Please click here to import your .CEL file for analysis', command=callback)
+a.pack()
+
+# Exporting results on GUI
+# output variable can have results  
+tkMessageBox.showinfo("The results of analysis are", output)
+
+mainloop()

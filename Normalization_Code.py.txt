@@ -1,0 +1,7 @@
+setwd("C:/Users/spawar2/Downloads")             # setting working directory
+library(affy)                 
+affy.data = ReadAffy()              # Reading file in R
+mas5 = mas5(affy.data)          #mas5.0 normalization, try RMA normalization
+expressionSet.nologs = exprs(mas5)        # extracting expression values
+expressionSet = log(expressionSet.nologs, 2)               # taking log to base 2
+write.table(expressionSet, file="lungcancer.txt", quote=F, sep="\t")         # exporting data in txt file
